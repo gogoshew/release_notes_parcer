@@ -70,7 +70,7 @@ def convert_text_to_string(content):
 
     def process_content(block):
         if isinstance(block, str):
-            res.append(block)
+            res.append("- " + block)
         elif isinstance(block, list):
             for item in block:
                 process_content(item)
@@ -141,9 +141,9 @@ if __name__ == "__main__":
     root_directory = "/Users/iabalymov/GolandProjects/docs-v2"
     output_directory = "../src"
 
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-    find_and_copy_yaml_files(root_directory, output_directory)
+    # if not os.path.exists(output_directory):
+    #     os.makedirs(output_directory)
+    #
+    # find_and_copy_yaml_files(root_directory, output_directory)
 
     release_notes = process_yaml_files_in_directory(output_directory)
