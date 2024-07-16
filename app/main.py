@@ -91,7 +91,7 @@ def format_data(filename: str, yaml_slice: list) -> list:
             "text": fix_tags(convert_text_to_string(note.get('text', "").get('ru', ""))),
             "status": "RELEASE_NOTE_STATUS_PUBLISHED",
             "date": datetime.strptime(note.get('date_publish', ""), "%d.%m.%Y").strftime("%Y-%m-%d") + "T00:00:00Z",
-            "mainTag": "RELEASE_NOTE_MAIN_TAG_MAJOR",
+            "mainTag": "RELEASE_NOTE_MAIN_TAG_MINOR",
             "scope": [scopes.get(filename.split('.')[0], "")],
             "type": "RELEASE_NOTE_TYPE_NEW",
             "localizedHeaders": {
@@ -133,6 +133,10 @@ def fix_tags(text):
 
     fixed_text = re.sub(pattern, replacement, text)
     fixed_text = fixed_text.replace('<br>', '<br />')
+    fixed_text = fixed_text.replace('<makr>', '<code>')
+    fixed_text = fixed_text.replace('<code>{', '<code>&#123;')
+    fixed_text = fixed_text.replace('}</code>', '&#125;</code>')
+    fixed_text = fixed_text.replace('<a class', '<a className')
 
     return fixed_text
 
