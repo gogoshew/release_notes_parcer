@@ -4,8 +4,11 @@ import yaml
 import requests
 import re
 from datetime import datetime
+import json
 
 url_stage = 'http://sapi-docs-ingress-controller.sapi-docs.k8s.stage-xc/api/v1/admin/release_notes'
+
+replinks = []
 
 scopes = {
     'general': 'api-information',
@@ -71,26 +74,44 @@ def convert_text_to_string(content):
     def process_content(block):
         if isinstance(block, str):
             res.append("- " + block)
+            # if 'REPLINK' in block:
+                # collect_links(replinks, block)
         elif isinstance(block, list):
             for item in block:
                 process_content(item)
         elif isinstance(block, dict):
             for key, value in block.items():
+                key = key + " "
                 process_content(key)
                 process_content(value)
 
     process_content(content)
-    return "\n".join(res)
+    return "\n\t".join(res)
 
 
 def format_data(filename: str, yaml_slice: list) -> list:
     res = []
+    date_format = "%d.%m.%Y"
+    actual_date = datetime.strptime("08.05.2024", date_format)
     for note in yaml_slice:
+        formatted_date = datetime.strptime(note.get('date_publish', ""), date_format)
+        ru_text = fix_tags(convert_text_to_string(note.get('text', "").get('ru', "")))
+        en_text = fix_tags(convert_text_to_string(note.get('text', "").get('en', "")))
+        cn_text = fix_tags(convert_text_to_string(note.get('text', "").get('cn', "")))
+        if formatted_date < actual_date:
+            ru_text = remove_anchor_tags(ru_text)
+            en_text = remove_anchor_tags(en_text)
+            cn_text = remove_anchor_tags(cn_text)
+        else:
+            ru_text = replace_link(ru_text, 'ru')
+            en_text = replace_link(en_text, 'en')
+            cn_text = replace_link(cn_text, 'cn')
+
         data = {
             "header": note.get('title', "").get('ru', ""),
-            "text": fix_tags(convert_text_to_string(note.get('text', "").get('ru', ""))),
+            "text": ru_text,
             "status": "RELEASE_NOTE_STATUS_PUBLISHED",
-            "date": datetime.strptime(note.get('date_publish', ""), "%d.%m.%Y").strftime("%Y-%m-%d") + "T00:00:00Z",
+            "date": datetime.strptime(note.get('date_publish', ""), date_format).strftime("%Y-%m-%d") + "T00:00:00Z",
             "mainTag": "RELEASE_NOTE_MAIN_TAG_MINOR",
             "scope": [scopes.get(filename.split('.')[0], "")],
             "type": "RELEASE_NOTE_TYPE_NEW",
@@ -100,9 +121,9 @@ def format_data(filename: str, yaml_slice: list) -> list:
                 'cn': note.get('title', "").get('cn', ""),
             },
             "localizedTexts": {
-                'ru': fix_tags(convert_text_to_string(note.get('text', "").get('ru', ""))),
-                'en': fix_tags(convert_text_to_string(note.get('text', "").get('en', ""))),
-                'cn': fix_tags(convert_text_to_string(note.get('text', "").get('cn', ""))),
+                'ru': ru_text,
+                'en': en_text,
+                'cn': cn_text,
             }
         }
         res.append(data)
@@ -117,7 +138,9 @@ def process_yaml_files_in_directory(directory):
             yaml_file_path = os.path.join(directory, filename)
             yaml_dict = load_yaml_to_dict(yaml_file_path)
             for data in format_data(filename, yaml_dict.get('releasenotes', "")):
-                send_post_request(url_stage, data)
+                # send_post_request(url_stage, data)
+                print(data)
+                pass
     return yaml_files_data
 
 
@@ -141,6 +164,42 @@ def fix_tags(text):
     return fixed_text
 
 
+def remove_anchor_tags(text):
+    pattern = r'<a\s+[^>]*>(.*?)</a>'
+    return re.sub(pattern, r'\1', text)
+
+
+def replace_link(text, locale):
+    pattern = r'<a href="REPLINK/(.*?)"'
+    replacement = fr'<a href="/{locale}/openapi/\1"'
+    output_string = re.sub(pattern, replacement, text)
+    return output_string
+
+# def collect_links(res: list, link: str):
+#     match = re.search(r'(<a [^>]+>)', link)
+#     if match:
+#         res = res.append(match.group(1))
+#     else:
+#         return None
+#     return res
+#
+#
+# def create_and_write_json(file_name):
+#     with open(file_name, 'w') as file:
+#         json.dump([], file)
+#
+#
+# def append_to_json(file_name, lines):
+#     with open(file_name, 'r') as file:
+#         data = json.load(file)
+#
+#     for line in lines:
+#         data.append(line)
+#
+#     with open(file_name, 'w') as file:
+#         json.dump(data, file, indent=4)
+
+
 if __name__ == "__main__":
     root_directory = "/Users/iabalymov/GolandProjects/docs-v2"
     output_directory = "../src"
@@ -151,3 +210,6 @@ if __name__ == "__main__":
     # find_and_copy_yaml_files(root_directory, output_directory)
 
     release_notes = process_yaml_files_in_directory(output_directory)
+    # create_and_write_json('replinks.json')
+    # append_to_json('replinks.json', replinks)
+
